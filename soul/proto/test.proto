@@ -1,0 +1,16 @@
+syntax = "proto3";
+package echopb;
+
+import "google/api/annotations.proto";
+
+message TestMessage {
+ string value = 1;
+}
+
+service Test {
+  rpc GetTestMsg(TestMessage) returns (TestMessage) {
+    option (google.api.http) = {
+      get: "/v1/test"
+    };
+  }
+}
