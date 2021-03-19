@@ -1,3 +1,5 @@
+package insecure
+
 const (
 	Key = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAuR4VDe/5Jbrj4rUD6mXZGMWpuEkCifUToZpTIFf8aT5UsTdp
