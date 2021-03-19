@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
-	pb "github.com/philips/soul/pb"
+	pb "rest/pb"
 )
 
 // echoCmd represents the echo command

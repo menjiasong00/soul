@@ -11,9 +11,9 @@ import (
 	"strings"
 	"reflect"
 	
-	"github.com/philips/soul/config/srvs"
+	"rest/config/srvs"
 	
-	"github.com/philips/soul/pkg/ui/data/swagger"
+	"rest/pkg/ui/data/swagger"
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/philips/go-bindata-assetfs"
@@ -22,7 +22,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	pb "github.com/philips/soul/pb"
+	pb "rest/pb"
 )
 
 // serveCmd represents the serve command

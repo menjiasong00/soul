@@ -14,7 +14,8 @@
 
 package main
 
-import "github.com/philips/soul/cmd"
+import "rest/cmd"
+
 
 func main() {
 	cmd.Execute()

@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/philips/soul/insecure"
+	"rest/insecure"
 )
 
 const (

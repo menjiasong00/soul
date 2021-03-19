@@ -1,7 +1,7 @@
 package service
 
 import(
-	pb "github.com/philips/soul/pb"
+	pb "rest/pb"
 	"golang.org/x/net/context"
 	"fmt"
 )

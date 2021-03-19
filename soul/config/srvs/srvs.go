@@ -1,8 +1,8 @@
 package srvs
 
 import(
-	pb "github.com/philips/soul/pb"
-	"github.com/philips/soul/service"
+	pb "rest/pb"
+	"rest/service"
 )
 
 var ServerMap= make(map[string]map[string]interface{})
