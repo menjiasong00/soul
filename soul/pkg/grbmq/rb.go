@@ -6,11 +6,18 @@ import (
 	"github.com/rs/xid"
 	"github.com/streadway/amqp"
 	"golang.org/x/net/context"
+	"log"
 	"reflect"
-	"rest/config"
-	"rest/util/tools"
-	"rest/util/wlog"
 	"time"
+)
+
+const (
+	host = "127.0.0.1"
+	port = "5672"
+	username = "guest"
+	password = "guest"
+	vhost = ""
+	retry = 600
 )
 
 //Rbmq 结构体
@@ -52,18 +59,18 @@ func init() {
 //New 初始化默认
 func New() (q *Rbmq) {
 	qConfig := ConnConfig{
-		Host:     config.Vip.GetString("queue.host"),
-		Port:     config.Vip.GetString("queue.port"),
-		User:     config.Vip.GetString("queue.username"),
-		Password: config.Vip.GetString("queue.password"),
-		Vhost:    config.Vip.GetString("queue.vhost"),
+		Host:     host,
+		Port:     port,
+		User:     username,
+		Password: password,
+		Vhost:    vhost,
 	}
 	q = &Rbmq{config: qConfig}
 	q.Priority = "8"
 	q.MsgHeader = make(map[string]interface{}, 10)
-	appid := config.Vip.GetString("queue.appid." + *config.Server)
+	appid := "test"
 	if len(appid) > 0 {
-		q.MsgHeader["appid"] = config.Vip.GetString("queue.appid." + *config.Server)
+		q.MsgHeader["appid"] = appid
 	}
 	return
 }
@@ -73,8 +80,8 @@ func (q *Rbmq) connWatch(addr string) {
 	defer func() {
 		//捕获抛出的panic 进入重试， 不要影响进程挂掉
 		if err := recover(); err != nil {
-			wlog.Error("发生panic错误：", err)
-			//log.Println(err)
+			//wlog.Error("发生panic错误：", err)
+			log.Println(err)
 		}
 	}()
 
@@ -82,11 +89,11 @@ func (q *Rbmq) connWatch(addr string) {
 		q.isConnected = false
 		for q.tryConnect(addr) != nil {
 			err := q.tryConnect(addr)
-			//log.Printf("connect false . retry... ： %s", err.Error())
-			x := config.Vip.GetInt("queue.retryWaitSecond")
+			log.Printf("connect false . retry... ： %s", err.Error())
+			x := retry
 			tryWaitSecond := time.Duration(x) * time.Second
 			time.Sleep(tryWaitSecond)
-			wlog.Error("mq连接错误，重试..", err)
+			//log.Printf("connect false . retry... ： %s", err.Error())
 		}
 		select {
 		case <-q.done:
@@ -115,8 +122,7 @@ func (q *Rbmq) tryConnect(addr string) error {
 	ch.NotifyClose(q.notifyClose)
 
 	q.isConnected = true
-	wlog.Info("mq已连接")
-	//log.Println("mq has connect.")
+	log.Println("mq has connect.")
 	return nil
 }
 
@@ -214,8 +220,7 @@ func (q *Rbmq) Publish(exchangeName string, routingKey string, data interface{})
 		return err
 	}
 	//
-	wlog.Info("发送消息：", data, routingKey, exchangeName)
-	//log.Printf(" send mgs: %s , routing: %s ，exchange:  %s", body, routingKey,exchangeName)
+	log.Printf(" send mgs: %s , routing: %s ，exchange:  %s", body, routingKey,exchangeName)
 	//q.Destroy()
 	return nil
 
@@ -237,60 +242,38 @@ type ReceiverConfig struct {
 }
 
 //Consumer配置项  即将改造的新版。
-type ConsumerConfig struct {
+type Consumer struct {
 	QueueName   string
 	Workers     int
 	Controllers map[string][]interface{}
 
 	//以下合并配置
-	//流控
-	PrefetchCount int
-	PrefetchSize  int
-	Global        bool
-	//策略
-	XCancelOnHaFailover bool
-
-	//错误后是否ack
-	ErrorAck bool
-	//是否包含头
-	IncludeHeader bool
+	Config ReceiverConfig
 }
 
 //RunConsumerNew 即将改造的新版。
-func (q *Rbmq) RunConsumerNew(Services []ConsumerConfig) {
+func (q *Rbmq) RunConsumerNew(Services []Consumer) {
 	//连接守护协程
 	go Mq.connWatch("amqp://" + Mq.config.User + ":" + Mq.config.Password + "@" + Mq.config.Host + ":" + Mq.config.Port + "/" + Mq.config.Vhost)
 
 	for _, v := range Services {
-		for i := 0; i <= v.Workers; i++ {
-			go q.Consumer(v.QueueName, v.Controllers)
+		for i := 0; i < v.Workers; i++ {
+			go q.Consumer(v.QueueName, v.Controllers,v.Config)
 		}
 	}
 }
 
-//RunConsumer 起服务时候用
-func (q *Rbmq) RunConsumer(ServicesMap map[string]map[string][]interface{}) {
 
-	//连接守护协程
-	go Mq.connWatch("amqp://" + Mq.config.User + ":" + Mq.config.Password + "@" + Mq.config.Host + ":" + Mq.config.Port + "/" + Mq.config.Vhost)
-
-	//一个队列起一个go协程，运行消费者监听
-	for k, v := range ServicesMap {
-		go q.Consumer(k, v)
-	}
-
-	time.Sleep(1 * time.Second)
-}
 
 //Consumer  队列Service监听 执行  service服务的funcName方法
-func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{}) {
+func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{},rConfig ReceiverConfig) {
 
 	var matchServicesMap []interface{}
-	var rConfig ReceiverConfig
+	//var rConfig ReceiverConfig
 
 	for _, v := range oneServicesMap {
 		//取map第一行，兼容不配置路由key的情况
-		rConfig = v[3].(ReceiverConfig)
+		//rConfig = v[3].(ReceiverConfig)
 		matchServicesMap = v
 		break
 	}
@@ -319,22 +302,9 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 			args,      // args
 		)
 		if err != nil {
-			wlog.Error("Consume错误：", err)
-			//log.Printf("consume return error ： %s", err.Error())
+			log.Printf("consume return error ： %s", err.Error())
 			q.err = err
 		} else {
-
-			//异常监控,已经移动到公共的连接守护
-			/*		go func(chan<- bool) {
-					cc := make(chan *amqp.Error)
-					err := <-q.channel.NotifyClose(cc)
-					if err != nil {
-						fmt.Printf("NotifyClose获取消费通道异常:%s \n", err)
-						forever <- false
-						return
-					}
-					forever <- true
-				}(forever)*/
 
 			go func(<-chan bool) {
 
@@ -342,8 +312,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 					select {
 					case d, chStatus := <-msgs:
 						if !chStatus {
-							wlog.Error("连接错误或者队列被更改：", err)
-							//log.Printf("chanel error ,connection error or queue has been changed  :%s \n", d)
+							log.Printf("chanel error ,connection error or queue has been changed  :%s \n", d)
 							forever <- false
 							return
 						}
@@ -362,7 +331,6 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 						defer func() {
 							//捕获抛出的panic 进入重试， 不要影响进程挂掉
 							if err := recover(); err != nil {
-								tools.FatalAndEmail("Mq消费发生panic的致命错误,消费者挂了："+config.Vip.GetString("queue.host")+queueName+" "+funcName, err)
 								d.Reject(false)
 								forever <- false
 							}
@@ -370,8 +338,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 
 						//消费
 						msg := bytesToString(&(d.Body))
-						wlog.Info("队列收到消息：", *msg, d.Headers, queueName, funcName)
-						//log.Printf(" consumer queue: %s receive msg: %s", queueName, *msg)
+						log.Printf(" consumer queue: %s receive msg: %s", queueName, *msg)
 
 						requestData := []byte(*msg)
 
@@ -404,23 +371,19 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 						//消费结束
 						if errReturn != nil {
 							//消费失败
-							wlog.Error("方法执行错误：", errReturn, queueName, funcName, *msg, d.Headers)
-							//log.Printf(" consumer queue: %s call func: %s , return error :%s , params: %s , header: %s\n", queueName, funcName, err,*msg , d.Headers)
+							log.Printf(" consumer queue: %s call func: %s , return error :%s , params: %s , header: %s\n", queueName, funcName, err,*msg , d.Headers)
 							//手工拒绝 进入死信
 							d.Reject(false)
 						} else {
 							errReturn = d.Ack(true)
 							if errReturn != nil {
 								//ack失败
-								//wlog.Error("ack错误：",err, queueName, funcName,*msg , d.Headers)
-								//log.Printf("ack false:%s %s \n", err,queueName)
-								tools.FatalAndEmail("Mq消费ack错误,消费者挂了："+config.Vip.GetString("queue.host")+queueName+" "+funcName, errReturn)
+								log.Printf("ack false:%s %s \n", err,queueName)
 								//forever <- false
 								return
 							}
 							//消费成功
-							wlog.Info("方法执行成功：", *msg, queueName, funcName)
-							//log.Printf(" consumer queue: %s call func: %s , done , params: %s . ", queueName, funcName,*msg)
+							log.Printf(" consumer queue: %s call func: %s , done , params: %s . ", queueName, funcName,*msg)
 						}
 
 					case <-q.notifyClose: //守护连接协程发出异常
@@ -432,18 +395,16 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 				}
 			}(forever)
 
-			wlog.Info("队列已启动，正在监听消息：", queueName)
-			//log.Printf("consumer queue: %s waiting for msg ,listen func : %s", queueName,funcName)
+			log.Printf("consumer queue: %s waiting for msg ", queueName)
 			<-forever
 		}
 	}
 	ch.Close()
 	q.Destroy()
-	wlog.Info("队列启动重试中...：", queueName)
-	//log.Printf("consumer queue: %s will connect latter...", queueName)
+	log.Printf("consumer queue: %s will connect latter...", queueName)
 
-	tryWaitSecond := time.Duration(config.Vip.GetInt("queue.retryWaitSecond")) * time.Second
+	tryWaitSecond := time.Duration(retry) * time.Second
 	time.Sleep(tryWaitSecond)
-	go q.Consumer(queueName, oneServicesMap)
+	go q.Consumer(queueName, oneServicesMap,rConfig)
 	//q.Destroy()
 }
