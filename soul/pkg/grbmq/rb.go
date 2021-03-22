@@ -89,11 +89,11 @@ func (q *Rbmq) connWatch(addr string) {
 		q.isConnected = false
 		for q.tryConnect(addr) != nil {
 			err := q.tryConnect(addr)
-			log.Printf("connect false . retry... ： %s", err.Error())
+			log.Printf("connect false . retry... ： [%s]", err.Error())
 			x := retry
 			tryWaitSecond := time.Duration(x) * time.Second
 			time.Sleep(tryWaitSecond)
-			//log.Printf("connect false . retry... ： %s", err.Error())
+			//log.Printf("connect false . retry... ： [%s]", err.Error())
 		}
 		select {
 		case <-q.done:
@@ -220,7 +220,7 @@ func (q *Rbmq) Publish(exchangeName string, routingKey string, data interface{})
 		return err
 	}
 	//
-	log.Printf(" send mgs: %s , routing: %s ，exchange:  %s", body, routingKey,exchangeName)
+	log.Printf(" send mgs: [%s] , routing: [%s] ，exchange:  [%s]", body, routingKey,exchangeName)
 	//q.Destroy()
 	return nil
 
@@ -302,7 +302,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 			args,      // args
 		)
 		if err != nil {
-			log.Printf("consume return error ： %s", err.Error())
+			log.Printf("consume return error ： [%s]", err.Error())
 			q.err = err
 		} else {
 
@@ -312,7 +312,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 					select {
 					case d, chStatus := <-msgs:
 						if !chStatus {
-							log.Printf("chanel error ,connection error or queue has been changed  :%s \n", d)
+							log.Printf("chanel error ,connection error or queue has been changed  :[%s] \n", d)
 							forever <- false
 							return
 						}
@@ -338,7 +338,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 
 						//消费
 						msg := bytesToString(&(d.Body))
-						log.Printf(" consumer queue: %s receive msg: %s", queueName, *msg)
+						log.Printf(" consumer queue: [%s] receive msg: [%s]", queueName, *msg)
 
 						requestData := []byte(*msg)
 
@@ -371,19 +371,19 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 						//消费结束
 						if errReturn != nil {
 							//消费失败
-							log.Printf(" consumer queue: %s call func: %s , return error :%s , params: %s , header: %s\n", queueName, funcName, err,*msg , d.Headers)
+							log.Printf(" consumer queue: [%s] call func: [%s] , return error :[%s] , params: [%s] , header: [%s]\n", queueName, funcName, err,*msg , d.Headers)
 							//手工拒绝 进入死信
 							d.Reject(false)
 						} else {
 							errReturn = d.Ack(true)
 							if errReturn != nil {
 								//ack失败
-								log.Printf("ack false:%s %s \n", err,queueName)
+								log.Printf("ack false:[%s] [%s] \n", err,queueName)
 								//forever <- false
 								return
 							}
 							//消费成功
-							log.Printf(" consumer queue: %s call func: %s , done , params: %s . ", queueName, funcName,*msg)
+							log.Printf(" consumer queue: [%s] call func: [%s] , done , params: [%s] . ", queueName, funcName,*msg)
 						}
 
 					case <-q.notifyClose: //守护连接协程发出异常
@@ -395,13 +395,13 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 				}
 			}(forever)
 
-			log.Printf("consumer queue: %s waiting for msg ", queueName)
+			log.Printf("consumer queue: [%s] waiting for msg ", queueName)
 			<-forever
 		}
 	}
 	ch.Close()
 	q.Destroy()
-	log.Printf("consumer queue: %s will connect latter...", queueName)
+	log.Printf("consumer queue: [%s] will connect latter...", queueName)
 
 	tryWaitSecond := time.Duration(retry) * time.Second
 	time.Sleep(tryWaitSecond)
