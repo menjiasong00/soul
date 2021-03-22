@@ -13,29 +13,48 @@ func init(){
 
 
 	//消费者配置
-	Consumers := []rb.Consumer{
+	ConsumerSettings := []rb.ConsumerSetting{
+		//ihr
 		{
 			QueueName:"oa.employee.ihr",
+			RoutingKey:"oa.employee.entry",
 			Workers:2,
-			Controllers:map[string][]interface{}{
-				"oa.employee.entry": {&service.TestServer{}, "GetTestMsg", &pb.TestMessage{}},
+			Service:&service.TestServer{},
+			Controller:"GetTestMsg",
+			Request:&pb.TestMessage{},
+			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
+		},
+		{
+			QueueName:"oa.employee.ihr",
+			RoutingKey:"oa.employee.out",
+			Workers:1,
+			Service:&service.TestServer{},
+			Controller:"GetTestMsg",
+			Request:&pb.TestMessage{},
+			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
+		},
 
-				"oa.employee.entry2": {&service.TestServer{}, "GetTestMsg", &pb.TestMessage{}},
-
-			},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, true},
+		//rms
+		{
+			QueueName:"oa.employee.rms",
+			RoutingKey:"oa.employee.entry",
+			Workers:1,
+			Service:&service.TestServer{},
+			Controller:"GetTestMsg",
+			Request:&pb.TestMessage{},
+			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
 		},
 		{
 			QueueName:"oa.employee.rms",
+			RoutingKey:"oa.employee.out",
 			Workers:1,
-			Controllers:map[string][]interface{}{
-				"oa.employee.entry": {&service.TestServer{}, "GetTestMsg", &pb.TestMessage{}},
-
-				"oa.employee.entry2": {&service.TestServer{}, "GetTestMsg", &pb.TestMessage{}},
-
-			},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, true},
+			Service:&service.TestServer{},
+			Controller:"GetTestMsg",
+			Request:&pb.TestMessage{},
+			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
 		},
 	}
-	rb.Mq.RunConsumerNew(Consumers)
+
+	rb.Mq.RunConsumers(ConsumerSettings)
+
 }

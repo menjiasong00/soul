@@ -7,6 +7,7 @@ import (
 	"github.com/streadway/amqp"
 	"golang.org/x/net/context"
 	"log"
+	//"net/http"
 	"reflect"
 	"time"
 )
@@ -46,13 +47,42 @@ type ConnConfig struct {
 	Vhost    string
 }
 
+
+
+
+//Consumer消费者配置项
+type ConsumerSetting struct {
+	QueueName   string
+	Workers     int
+	RoutingKey    string
+	Service   interface{}
+	Controller        string
+	Request   interface{}
+	//以下特殊配置配置
+	Config ReceiverConfig
+}
+
+//配置项
+type ReceiverConfig struct {
+	//流控
+	PrefetchCount int
+	PrefetchSize  int
+	Global        bool
+	//策略
+	XCancelOnHaFailover bool
+
+	//错误后是否ack
+	ErrorAck bool
+	//是否包含头
+	IncludeHeader bool
+}
+
 //Mq 全局静态mq变量
 var Mq *Rbmq
 
 func init() {
 	if Mq == nil {
 		Mq = New().MakeConn()
-
 	}
 }
 
@@ -226,57 +256,27 @@ func (q *Rbmq) Publish(exchangeName string, routingKey string, data interface{})
 
 }
 
-//配置项
-type ReceiverConfig struct {
-	//流控
-	PrefetchCount int
-	PrefetchSize  int
-	Global        bool
-	//策略
-	XCancelOnHaFailover bool
-
-	//错误后是否ack
-	ErrorAck bool
-	//是否包含头
-	IncludeHeader bool
-}
-
-//Consumer配置项  即将改造的新版。
-type Consumer struct {
-	QueueName   string
-	Workers     int
-	Controllers map[string][]interface{}
-
-	//以下合并配置
-	Config ReceiverConfig
-}
-
 //RunConsumerNew 即将改造的新版。
-func (q *Rbmq) RunConsumerNew(Services []Consumer) {
-	//连接守护协程
+func (q *Rbmq) RunConsumers(Services []ConsumerSetting) {
+	ServiceMap := make(map[string]ConsumerSetting,0)
+	for _, v := range Services {
+		ServiceMap[v.QueueName+":"+v.RoutingKey] = v
+	}
+
+		//连接守护协程
 	go Mq.connWatch("amqp://" + Mq.config.User + ":" + Mq.config.Password + "@" + Mq.config.Host + ":" + Mq.config.Port + "/" + Mq.config.Vhost)
 
 	for _, v := range Services {
 		for i := 0; i < v.Workers; i++ {
-			go q.Consumer(v.QueueName, v.Controllers,v.Config)
+			go q.Consumer(v,ServiceMap)
 		}
 	}
 }
 
-
-
 //Consumer  队列Service监听 执行  service服务的funcName方法
-func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{},rConfig ReceiverConfig) {
+func (q *Rbmq) Consumer(vConsumer ConsumerSetting,ServiceMap map[string]ConsumerSetting) {
+	rConfig:= vConsumer.Config
 
-	var matchServicesMap []interface{}
-	//var rConfig ReceiverConfig
-
-	for _, v := range oneServicesMap {
-		//取map第一行，兼容不配置路由key的情况
-		//rConfig = v[3].(ReceiverConfig)
-		matchServicesMap = v
-		break
-	}
 
 	//官网建议,多线程尽量共享连接，独享信道。
 	var ch *amqp.Channel
@@ -293,7 +293,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 		args["x-cancel-on-ha-failover"] = rConfig.XCancelOnHaFailover
 
 		msgs, err := ch.Consume(
-			queueName, // queue
+			vConsumer.QueueName, // queue
 			"",        // consumer
 			false,     // auto ack
 			false,     // exclusive
@@ -316,76 +316,74 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 							forever <- false
 							return
 						}
+						keyName := vConsumer.QueueName+":"+d.RoutingKey
 
-						//如果有配路由key的，用路由key对应的映射
-						if v2, ok := oneServicesMap[d.RoutingKey]; ok {
-//							rConfig = v2[3].(ReceiverConfig)
-							matchServicesMap = v2
-						}
+						if vConsumer, ok := ServiceMap[keyName]; ok {
 
-						//取到映射信息
-						service := matchServicesMap[0]
-						funcName := matchServicesMap[1].(string)
-						request := matchServicesMap[2]
+							service := vConsumer.Service.(interface{})
+							funcName := vConsumer.Controller
+							request := vConsumer.Request.(interface{})
 
-						defer func() {
-							//捕获抛出的panic 进入重试， 不要影响进程挂掉
-							if err := recover(); err != nil {
-								d.Reject(false)
-								forever <- false
+							defer func() {
+								//捕获抛出的panic 进入重试， 不要影响进程挂掉
+								if err := recover(); err != nil {
+									d.Reject(false)
+									forever <- false
+								}
+							}()
+
+							//消费
+							msg := bytesToString(&(d.Body))
+							log.Printf("consumer receive msg .  queue: [%s] routingkey: [%s]  msg: [%s]", vConsumer.QueueName,vConsumer.RoutingKey, *msg)
+
+							requestData := []byte(*msg)
+
+							//请求体是否包含头
+							if rConfig.IncludeHeader {
+								headerJson, _ := json.Marshal(d.Headers)
+								header := bytesToString(&(headerJson))
+								requestData, _ = json.Marshal(map[string]interface{}{"header": *header, "body": *msg})
 							}
-						}()
 
-						//消费
-						msg := bytesToString(&(d.Body))
-						log.Printf(" consumer queue: [%s] receive msg: [%s]", queueName, *msg)
+							//拷贝一个新的 指针变量
+							requestNew := reflect.New(reflect.ValueOf(request).Elem().Type()).Interface()
 
-						requestData := []byte(*msg)
+							//把消息解析进pb的request
+							json.Unmarshal(requestData, requestNew)
 
-						//请求体是否包含头
-						if rConfig.IncludeHeader {
-							headerJson, _ := json.Marshal(d.Headers)
-							header := bytesToString(&(headerJson))
-							requestData, _ = json.Marshal(map[string]interface{}{"header": *header, "body": *msg})
-						}
-
-						//拷贝一个新的 指针变量
-						requestNew := reflect.New(reflect.ValueOf(request).Elem().Type()).Interface()
-
-						//把消息解析进pb的request
-						json.Unmarshal(requestData, requestNew)
-
-						//反射service服务并执行funcName方法，请求是ctx,request
-						params := make([]reflect.Value, 2)
-						ctx := context.Background()
-						params[0] = reflect.ValueOf(ctx)
-						params[1] = reflect.ValueOf(requestNew)
-						out := reflect.ValueOf(service).MethodByName(funcName).Call(params)
-						var errReturn error
-						//如果执行return error，则记录错误
-						if len(out) > 1 {
-							if out[1].Interface() != nil {
-								errReturn = out[1].Interface().(error)
+							//反射service服务并执行funcName方法，请求是ctx,request
+							params := make([]reflect.Value, 2)
+							ctx := context.Background()
+							params[0] = reflect.ValueOf(ctx)
+							params[1] = reflect.ValueOf(requestNew)
+							out := reflect.ValueOf(service).MethodByName(funcName).Call(params)
+							var errReturn error
+							//如果执行return error，则记录错误
+							if len(out) > 1 {
+								if out[1].Interface() != nil {
+									errReturn = out[1].Interface().(error)
+								}
 							}
-						}
-						//消费结束
-						if errReturn != nil {
-							//消费失败
-							log.Printf(" consumer queue: [%s] call func: [%s] , return error :[%s] , params: [%s] , header: [%s]\n", queueName, funcName, err,*msg , d.Headers)
-							//手工拒绝 进入死信
-							d.Reject(false)
-						} else {
-							errReturn = d.Ack(true)
+							//消费结束
 							if errReturn != nil {
-								//ack失败
-								log.Printf("ack false:[%s] [%s] \n", err,queueName)
-								//forever <- false
-								return
-							}
-							//消费成功
-							log.Printf(" consumer queue: [%s] call func: [%s] , done , params: [%s] . ", queueName, funcName,*msg)
-						}
+								//消费失败
+								log.Printf("consumer error .  queue: [%s] call func: [%s] , return error :[%s] , params: [%s] , header: [%s]\n", vConsumer.QueueName, funcName, err,*msg , d.Headers)
+								//手工拒绝 进入死信
+								d.Reject(false)
+							} else {
+								errReturn = d.Ack(true)
+								if errReturn != nil {
+									//ack失败
+									log.Printf("consumer ack false .  queue: [%s] routingkey: [%s] call func: [%s]  ack false , params: [%s] . ", vConsumer.QueueName,vConsumer.RoutingKey, funcName,*msg)
 
+									//forever <- false
+									return
+								}
+								//消费成功
+								log.Printf("consumer finish .  queue: [%s] routingkey: [%s] call func: [%s]  done , params: [%s] . ", vConsumer.QueueName,vConsumer.RoutingKey, funcName,*msg)
+							}
+						}
+						
 					case <-q.notifyClose: //守护连接协程发出异常
 						forever <- false
 						return
@@ -395,16 +393,22 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 				}
 			}(forever)
 
-			log.Printf("consumer queue: [%s] waiting for msg ", queueName)
+			log.Printf("consumer waiting for msg .  queue: [%s] routingkey: [%s] . ", vConsumer.QueueName,vConsumer.RoutingKey)
+
 			<-forever
 		}
 	}
 	ch.Close()
 	q.Destroy()
-	log.Printf("consumer queue: [%s] will connect latter...", queueName)
+	log.Printf("consumer queue: [%s] will connect latter...", vConsumer.QueueName)
 
 	tryWaitSecond := time.Duration(retry) * time.Second
 	time.Sleep(tryWaitSecond)
-	go q.Consumer(queueName, oneServicesMap,rConfig)
+	go q.Consumer(vConsumer,ServiceMap)
 	//q.Destroy()
 }
+
+
+
+
+
