@@ -319,7 +319,7 @@ func (q *Rbmq) Consumer(queueName string, oneServicesMap map[string][]interface{
 
 						//如果有配路由key的，用路由key对应的映射
 						if v2, ok := oneServicesMap[d.RoutingKey]; ok {
-							rConfig = v2[3].(ReceiverConfig)
+//							rConfig = v2[3].(ReceiverConfig)
 							matchServicesMap = v2
 						}
 
