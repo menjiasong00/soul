@@ -7,14 +7,80 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"log"
 	"net"
 	"net/http"
 	"reflect"
 	"strings"
-
+	"google.golang.org/grpc/credentials"
 )
+
+//Consumer消费者配置项
+type ServeSetting struct {
+	Host   string
+	Server     interface{}
+	Register   interface{}
+	HandlerFromEndpoint   interface{}
+}
+
+
+//启动http服务
+func RunServeHTTP(servers []ServeSetting,port string) {
+	PORT := ":"+port
+	ctx := context.Background()
+	mux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+
+	//把server注册HTTP
+	for _,inter := range servers{
+		fn:= reflect.ValueOf(inter.HandlerFromEndpoint)
+		params := make([]reflect.Value, 4)
+		params[0] = reflect.ValueOf(ctx)
+		params[1] = reflect.ValueOf(mux)
+		params[2] = reflect.ValueOf(inter.Host)
+		params[3] = reflect.ValueOf(opts)
+		fn.Call(params)
+	}
+
+	log.Printf("listen http on "+PORT)
+
+	if err := http.ListenAndServe(PORT, mux); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+
+	return
+
+}
+
+//启动grpc服务
+func RunServeGRPC(servers []ServeSetting,port string) {
+	PORT := ":"+port
+	listener, err := net.Listen("tcp", PORT)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	log.Printf("listen grpc on "+PORT)
+
+	server := grpc.NewServer()
+
+	for _,inter := range servers{
+		fn:= reflect.ValueOf(inter.Register)
+		params := make([]reflect.Value, 2)
+		params[0] = reflect.ValueOf(server)
+		params[1] = reflect.ValueOf(inter.Server)
+		fn.Call(params)
+	}
+
+	if err := server.Serve(listener); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+
+}
+
+
+
+
 
 var (
 	demoKeyPair  *tls.Certificate
@@ -51,7 +117,7 @@ func grpcHandlerFunc(grpcServer *grpc.Server, otherHandler http.Handler) http.Ha
 
 
 //	ServerMap["test"] = map[string]interface{}{"Host":"localhost:10000","Server":&service.TestServer{},"Register":pb.RegisterTestServer,"HandlerFromEndpoint":pb.RegisterTestHandlerFromEndpoint}
-func RunServe(ServerMap map[string]map[string]interface{},serveAddr string,port int) {
+func RunServe(servers []ServeSetting,serveAddr string,port int) {
 
 	//启动GRPC服务
 	opts := []grpc.ServerOption{
@@ -60,11 +126,11 @@ func RunServe(ServerMap map[string]map[string]interface{},serveAddr string,port 
 	grpcServer := grpc.NewServer(opts...)
 
 	//把server注册GRPC
-	for _,inter := range ServerMap{
-		fn:= reflect.ValueOf(inter["Register"])
+	for _,inter := range servers{
+		fn:= reflect.ValueOf(inter.Register)
 		params := make([]reflect.Value, 2)
 		params[0] = reflect.ValueOf(grpcServer)
-		params[1] = reflect.ValueOf(inter["Server"])
+		params[1] = reflect.ValueOf(inter.Server)
 		fn.Call(params)
 	}
 
@@ -85,12 +151,12 @@ func RunServe(ServerMap map[string]map[string]interface{},serveAddr string,port 
 	gwmux := runtime.NewServeMux()
 
 	//把server注册HTTP
-	for _,inter := range ServerMap{
-		fn:= reflect.ValueOf(inter["HandlerFromEndpoint"])
+	for _,inter := range servers{
+		fn:= reflect.ValueOf(inter.HandlerFromEndpoint)
 		params := make([]reflect.Value, 4)
 		params[0] = reflect.ValueOf(ctx)
 		params[1] = reflect.ValueOf(gwmux)
-		params[2] = reflect.ValueOf(inter["Host"])
+		params[2] = reflect.ValueOf(inter.Host)
 		params[3] = reflect.ValueOf(dopts)
 		fn.Call(params)
 	}
