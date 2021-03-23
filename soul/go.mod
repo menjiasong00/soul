@@ -11,11 +11,13 @@ require (
 	github.com/pelletier/go-toml v1.8.1 // indirect
 	github.com/philips/go-bindata-assetfs v0.0.0-20150624150248-3dcc96556217 // indirect
 	github.com/philips/grpc-gateway-example v0.0.0-20170619012617-a269bcb5931c // indirect
+	github.com/rs/xid v1.2.1 // indirect
 	github.com/spf13/afero v1.5.1 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/cobra v1.1.3 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.7.1 // indirect
+	github.com/streadway/amqp v1.0.0 // indirect
 	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4 // indirect
 	golang.org/x/sys v0.0.0-20210317225723-c4fcb01b228e // indirect
 	golang.org/x/text v0.3.5 // indirect

@@ -7,6 +7,7 @@ import (
 	"rest/pkg/gcore"
 	//"rest/insecure"
 	"github.com/spf13/cobra"
+	"log"
 )
 
 
@@ -79,8 +80,8 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Launches the example webserver on  "+demoAddr,
 	Run: func(cmd *cobra.Command, args []string) {
-		rb.Mq.RunConsumers(ConsumerSettings)
-
+		//rb.Mq.RunConsumers(ConsumerSettings)
+log.Printf("",ConsumerSettings)
 		go gcore.RunServeGRPC(ServerSettings,grpcPort)
 		gcore.RunServeHTTP(ServerSettings,httpPort)
 		//gcore.MakeInsecure(insecure.Key,insecure.Cert)
