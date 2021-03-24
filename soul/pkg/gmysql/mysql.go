@@ -1,5 +1,37 @@
 package gmysql
 
+import (
+	"bytes"
+	"database/sql"
+	"fmt"
+	"strings"
+	"rest/pkg/tools"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+)
+
+const (
+	userName = "root"
+	password = "root"
+	ip = "127.0.0.1"
+	port = "3306"
+	dbName = "test"
+)
+var DB *gorm.DB
+
+func init() {
+	var err error
+	DB, err = gorm.Open(
+		"mysql",
+		fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			userName,
+			password,
+			ip+":"+port,
+			dbName))
+	if err != nil {
+		panic(err)
+	}
+}
 
 
 
