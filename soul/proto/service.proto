@@ -1,5 +1,5 @@
 syntax = "proto3";
-package echopb;
+package pb;
 
 import "google/api/annotations.proto";
 

@@ -154,3 +154,8 @@ func Strval(value interface{}) string {
 
 
 
+//ScanStuct 结构体扫到结构体
+func ScanStuct(in interface{}, out interface{}) {
+	body, _ := json.Marshal(&in)
+	json.Unmarshal(body, &out)
+}
