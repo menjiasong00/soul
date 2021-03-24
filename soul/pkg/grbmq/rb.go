@@ -1,4 +1,4 @@
-package rb
+package grbmq
 
 import (
 	"bytes"

@@ -1,17 +1,17 @@
 package cmd
 
 import (
-	rb "rest/pkg/grbmq"
+	grbmq "rest/pkg/grbmq"
 	pb "rest/pb"
-	"rest/service"
-	"rest/pkg/gcore"
+	service "rest/service"
+	gcore "rest/pkg/gcore"
 	//"rest/insecure"
 	"github.com/spf13/cobra"
 	"log"
 )
 
 
-var ConsumerSettings  = []rb.ConsumerSetting{}
+var ConsumerSettings  = []grbmq.ConsumerSetting{}
 var ServerSettings = []gcore.ServeSetting{}
 var grpcPort = "50050"
 var httpPort = "8080"
@@ -28,9 +28,8 @@ func init() {
 		},
 	}
 
-
 	//消费者配置
-	ConsumerSettings = []rb.ConsumerSetting{
+	ConsumerSettings = []grbmq.ConsumerSetting{
 		//ihr
 		{
 			QueueName:"oa.employee.ihr",
@@ -39,36 +38,9 @@ func init() {
 			Service:&service.TestServer{},
 			Controller:"GetTestMsg",
 			Request:&pb.TestMessage{},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
+			Config : grbmq.ReceiverConfig{1, 1, true, false, false, false},
 		},
-		{
-			QueueName:"oa.employee.ihr",
-			RoutingKey:"oa.employee.out",
-			Workers:1,
-			Service:&service.TestServer{},
-			Controller:"GetTestMsg",
-			Request:&pb.TestMessage{},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
-		},
-		//rms
-		{
-			QueueName:"oa.employee.rms",
-			RoutingKey:"oa.employee.entry",
-			Workers:1,
-			Service:&service.TestServer{},
-			Controller:"GetTestMsg",
-			Request:&pb.TestMessage{},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
-		},
-		{
-			QueueName:"oa.employee.rms",
-			RoutingKey:"oa.employee.out",
-			Workers:1,
-			Service:&service.TestServer{},
-			Controller:"GetTestMsg",
-			Request:&pb.TestMessage{},
-			Config : rb.ReceiverConfig{1, 1, true, false, false, false},
-		},
+
 	}
 
 	RootCmd.AddCommand(serveCmd)
@@ -80,8 +52,9 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Launches the example webserver on  "+demoAddr,
 	Run: func(cmd *cobra.Command, args []string) {
-		//rb.Mq.RunConsumers(ConsumerSettings)
-log.Printf("",ConsumerSettings)
+		//grbmq.Mq.RunConsumers(ConsumerSettings)
+		log.Printf("",args)
+		log.Printf("",ConsumerSettings)
 		go gcore.RunServeGRPC(ServerSettings,grpcPort)
 		gcore.RunServeHTTP(ServerSettings,httpPort)
 		//gcore.MakeInsecure(insecure.Key,insecure.Cert)
