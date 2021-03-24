@@ -6,9 +6,7 @@ import (
 	"rest/model"
 	"rest/pb"
 	"rest/pkg/tools"
-
 )
-
 
 type {{.ServerName}}Server struct{}
 
@@ -30,7 +28,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}List(ctx context.Context, in *pb.
 		offset := (in.PageNumber - 1) * in.PageSize
 		dbModel = dbModel.Offset(offset).Limit(in.PageSize)
 	}
-
+	
 	sortStr := " id DESC"
 	if in.OrderKey != "" && in.OrderSort != "" {
 		sortStr = in.OrderKey + " " + in.OrderSort
@@ -58,7 +56,8 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Detail(ctx context.Context, in *p
 
 //{{.ModuleName}}Create {{.Name}}新建
 func (s *{{.ServerName}}Server) {{.ModuleName}}Create(ctx context.Context, in *pb.{{.ModuleName}}OneRequest) (*pb.{{.ModuleName}}Response, error) {
-    //表单验证
+    
+	//表单验证
     errValidate := in.Validate()
     	if errValidate != nil {
     		return nil, errValidate
@@ -69,16 +68,13 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Create(ctx context.Context, in *p
 
 	gmysql.DB.Create(&{{.ModuleName}}One)
 
-
-
-
-
 	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
 }
 
 //{{.ModuleName}}Motify {{.Name}}修改
 func (s *{{.ServerName}}Server) {{.ModuleName}}Motify(ctx context.Context, in *pb.{{.ModuleName}}OneRequest) (*pb.{{.ModuleName}}Response, error) {
-    //表单验证
+    
+	//表单验证
     errValidate := in.Validate()
     	if errValidate != nil {
     		return nil, errValidate
@@ -90,8 +86,6 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Motify(ctx context.Context, in *p
 
 	gmysql.DB.Model(model.{{.ModelName}}{}).Where(" id = ?",in.Id).Save(&{{.ModuleName}}One)
 
-
-
 	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
 }
 
@@ -102,8 +96,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Delete(ctx context.Context, in *p
     gmysql.DB.Model(model.{{.ModelName}}{}).First(&{{.ModuleName}}One,in.Id)
     //{{.ModuleName}}One.Status = 2
     gmysql.DB.Save(&{{.ModuleName}}One)
-
-
+	
 	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
 }
 

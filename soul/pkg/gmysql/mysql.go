@@ -35,7 +35,7 @@ func init() {
 }
 
 
-
+//list ,err := gmysql.MapByQuery(gmysql.DB.DB(),"select * from products","string")
 //StringMapByQuery 查询sql后返回 []map[string]interface{} 字符串map数组 (columnsType == string 二进制值转字符串)
 func MapByQuery(db *sql.DB, sqlInfo string, columnsType string, args ...interface{}) ([]map[string]interface{}, error) {
 	rows, err := db.Query(sqlInfo, args...)
