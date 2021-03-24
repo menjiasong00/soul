@@ -15,7 +15,9 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-//Consumer消费者配置项
+//go-grpc-middleware 拦截器中间件 在网关加各种判断
+
+//微服务配置项
 type ServeSetting struct {
 	Host   string
 	Server     interface{}
