@@ -4,15 +4,22 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/golang/glog"
+	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"log"
 	"net"
 	"net/http"
 	"reflect"
 	"strings"
-	"google.golang.org/grpc/credentials"
+	"time"
 )
 
 //go-grpc-middleware 拦截器中间件 在网关加各种判断
@@ -28,9 +35,16 @@ type ServeSetting struct {
 
 //启动http服务
 func RunServeHTTP(servers []ServeSetting,port string) {
+
+    //http扩展
+	var gwOpts = []runtime.ServeMuxOption{
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{OrigName: true, EmitDefaults: true}),//修复json解析默认值问题
+	}
+
+
 	PORT := ":"+port
 	ctx := context.Background()
-	mux := runtime.NewServeMux()
+	mux := runtime.NewServeMux(gwOpts...)
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 
 	//把server注册HTTP
@@ -46,7 +60,7 @@ func RunServeHTTP(servers []ServeSetting,port string) {
 
 	log.Printf("listen http on "+PORT)
 
-	if err := http.ListenAndServe(PORT, mux); err != nil {
+	if err := http.ListenAndServe(PORT, AllowCORS(mux)); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
 
@@ -64,7 +78,41 @@ func RunServeGRPC(servers []ServeSetting,port string) {
 
 	log.Printf("listen grpc on "+PORT)
 
-	server := grpc.NewServer()
+	//GRPC 扩展
+	var servOpts = []grpc.ServerOption{
+		grpc.KeepaliveEnforcementPolicy(
+			keepalive.EnforcementPolicy{
+				MinTime:             5 * time.Second,   // If a client pings more than once every 5 seconds, terminate the connection
+				PermitWithoutStream: true,              // Allow pings even when there are no active streams
+			}),
+		grpc.MaxRecvMsgSize(1024 * 1024 * 20),    // 新建服务器，注册服务，防恐,调整, 修改grpc默认接收的msg大小
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle:     15 * time.Second,  // If a client is idle for 15 seconds, send a GOAWAY
+			MaxConnectionAge:      300 * time.Second, // If any connection is alive for more than 300 seconds, send a GOAWAY
+			MaxConnectionAgeGrace: 5 * time.Second,   // Allow 5 seconds for pending RPCs to complete before forcibly closing connections
+			Time:                  5 * time.Second,   // Ping the client if it is idle for 5 seconds to ensure the connection is still active
+			Timeout:               1 * time.Second,   // Wait 1 second for the ping ack before assuming the connection is dead
+		}),
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+			grpc_ctxtags.StreamServerInterceptor(),
+			grpc_opentracing.StreamServerInterceptor(),
+			//grpc_prometheus.StreamServerInterceptor,
+			//grpc_zap.StreamServerInterceptor(zapLogger),
+			//grpc_auth.StreamServerInterceptor(myAuthFunction),
+			grpc_recovery.StreamServerInterceptor(),
+		)),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			grpc_ctxtags.UnaryServerInterceptor(),
+			grpc_opentracing.UnaryServerInterceptor(),
+			//grpc_prometheus.UnaryServerInterceptor,
+			//grpc_zap.UnaryServerInterceptor(zapLogger),
+			//grpc_auth.UnaryServerInterceptor(myAuthFunction),
+			grpc_recovery.UnaryServerInterceptor(),
+		)),
+	}
+
+
+	server := grpc.NewServer(servOpts...)
 
 	for _,inter := range servers{
 		fn:= reflect.ValueOf(inter.Register)
@@ -80,7 +128,26 @@ func RunServeGRPC(servers []ServeSetting,port string) {
 
 }
 
-
+// Don't do this without consideration in production systems.
+func AllowCORS(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			if r.Method == "OPTIONS" && r.Header.Get("Access-Control-Request-Method") != "" {
+				preflightHandler(w, r)
+				return
+			}
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+func preflightHandler(w http.ResponseWriter, r *http.Request) {
+	//headers := []string{"Content-Type", "Accept"}
+	w.Header().Set("Access-Control-Allow-Headers", "*")
+	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE"}
+	w.Header().Set("Access-Control-Allow-Methods", strings.Join(methods, ","))
+	glog.Infof("preflight request for %s", r.URL.Path)
+}
 
 
 
