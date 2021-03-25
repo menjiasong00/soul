@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	userName = "root"
-	password = "root"
+	userName = "root2"
+	password = "123456"
 	ip = "127.0.0.1"
 	port = "3306"
 	dbName = "test"

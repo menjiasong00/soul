@@ -63,7 +63,7 @@ func RunServeHTTP(servers []ServeSetting,port string) {
 
 	log.Printf("listen http on "+PORT)
 
-	if err := http.ListenAndServe(PORT, AllowCORS(mux)); err != nil {
+	if err := http.ListenAndServe(PORT, httpHandler(mux)); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
 
@@ -190,7 +190,7 @@ func checkauth(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 
 
 // Don't do this without consideration in production systems.
-func AllowCORS(h http.Handler) http.Handler {
+func httpHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
