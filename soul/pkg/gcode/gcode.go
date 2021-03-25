@@ -11,11 +11,11 @@ import (
 )
 
 type MakeCodingRequest struct {
-	ServerName           string   `protobuf:"bytes,13,opt,name=serverName,proto3" json:"serverName,omitempty"`
-	ModuleName           string   `protobuf:"bytes,14,opt,name=moduleName,proto3" json:"moduleName,omitempty"`
-	TableName            string   `protobuf:"bytes,10,opt,name=tableName,proto3" json:"tableName,omitempty"`
-	Name                 string   `protobuf:"bytes,11,opt,name=name,proto3" json:"name,omitempty"`
-	DatabaseName         string   `protobuf:"bytes,15,opt,name=databaseName,proto3" json:"databaseName,omitempty"`
+	ServerName           string
+	ModuleName           string
+	TableName            string
+	Name                 string
+	DatabaseName         string
 
 }
 
