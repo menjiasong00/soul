@@ -3,6 +3,7 @@ package gcore
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"github.com/golang/glog"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
@@ -12,8 +13,10 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"log"
 	"net"
 	"net/http"
@@ -36,11 +39,11 @@ type ServeSetting struct {
 //启动http服务
 func RunServeHTTP(servers []ServeSetting,port string) {
 
-    //http扩展
+	//http扩展
 	var gwOpts = []runtime.ServeMuxOption{
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{OrigName: true, EmitDefaults: true}),//修复json解析默认值问题
+		//...
 	}
-
 
 	PORT := ":"+port
 	ctx := context.Background()
@@ -78,6 +81,7 @@ func RunServeGRPC(servers []ServeSetting,port string) {
 
 	log.Printf("listen grpc on "+PORT)
 
+
 	//GRPC 扩展
 	var servOpts = []grpc.ServerOption{
 		grpc.KeepaliveEnforcementPolicy(
@@ -107,6 +111,7 @@ func RunServeGRPC(servers []ServeSetting,port string) {
 			//grpc_prometheus.UnaryServerInterceptor,
 			//grpc_zap.UnaryServerInterceptor(zapLogger),
 			//grpc_auth.UnaryServerInterceptor(myAuthFunction),
+			grpc.UnaryServerInterceptor(checkauth),
 			grpc_recovery.UnaryServerInterceptor(),
 		)),
 	}
@@ -127,6 +132,62 @@ func RunServeGRPC(servers []ServeSetting,port string) {
 	}
 
 }
+
+func checkauth(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok != true {
+		return "", grpc.Errorf(codes.Unauthenticated, "found")
+	}
+	if len(md["grpcgateway-authorization"]) == 0 {
+
+		return "",   grpc.Errorf(codes.Unauthenticated, "authorization no found")
+	}
+
+	split := strings.Split(md["grpcgateway-authorization"][0], " ")
+	// 解码认证token
+	decodeBytes, err := base64.StdEncoding.DecodeString(split[1])
+	if err != nil {
+		return "", err
+	}
+
+	user := strings.Split(string(decodeBytes), ":")
+	username := user[0]
+	password := user[1]
+	fmt.Println(username,password)
+/*
+
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil,grpc.Errorf(codes.Unauthenticated, "无Token认证信息")
+	}
+
+	var (
+		appid  string
+		appkey string
+	)
+
+	if val, ok := md["appid"]; ok {
+		appid = val[0]
+	}
+
+	if val, ok := md["appkey"]; ok {
+		appkey = val[0]
+	}
+
+	if appid != "101010" || appkey != "i am key" {
+		return nil,grpc.Errorf(codes.Unauthenticated, "Token认证信息无效: appid=%s, appkey=%s", appid, appkey)
+	}
+*/
+    // 继续处理请求
+    return handler(ctx, req)
+}
+
+
+
+
+
+
 
 // Don't do this without consideration in production systems.
 func AllowCORS(h http.Handler) http.Handler {

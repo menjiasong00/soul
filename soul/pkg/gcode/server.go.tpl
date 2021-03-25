@@ -41,7 +41,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}List(ctx context.Context, in *pb.
 
 	}*/
 
-	return &pb.{{.ModuleName}}ListResponse{Status: 200, Message: "success", Data: resp}, nil
+	return &pb.{{.ModuleName}}ListResponse{Status: 200, Message: "success", Details: resp}, nil
 }
 
 //{{.ModuleName}}Detail {{.Name}}详情
@@ -50,7 +50,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Detail(ctx context.Context, in *p
 	resp := &pb.{{.ModuleName}}OneRequest{}
 	gmysql.DB.Model(model.{{.ModelName}}{}).Where("id = ?",in.Id).Scan(&resp)
 
-	return &pb.{{.ModuleName}}DetailResponse{Status: 200, Message: "success", Data: resp}, nil
+	return &pb.{{.ModuleName}}DetailResponse{Status: 200, Message: "success", Details: resp}, nil
 }
 
 
@@ -68,7 +68,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Create(ctx context.Context, in *p
 
 	gmysql.DB.Create(&{{.ModuleName}}One)
 
-	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
+	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Details:true}, nil
 }
 
 //{{.ModuleName}}Motify {{.Name}}修改
@@ -86,7 +86,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Motify(ctx context.Context, in *p
 
 	gmysql.DB.Model(model.{{.ModelName}}{}).Where(" id = ?",in.Id).Save(&{{.ModuleName}}One)
 
-	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
+	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Details:true}, nil
 }
 
 //{{.ModuleName}}Delete {{.Name}}删除
@@ -97,7 +97,7 @@ func (s *{{.ServerName}}Server) {{.ModuleName}}Delete(ctx context.Context, in *p
     //{{.ModuleName}}One.Status = 2
     gmysql.DB.Save(&{{.ModuleName}}One)
 	
-	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Data:true}, nil
+	return &pb.{{.ModuleName}}Response{Status: 200, Message: "success", Details:true}, nil
 }
 
 

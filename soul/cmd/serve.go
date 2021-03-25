@@ -30,6 +30,16 @@ func init() {
 
 	//消费者配置
 	ConsumerSettings = []grbmq.ConsumerSetting{
+	    //死信消费者
+		/*{
+			QueueName:"dlx.global.queue",
+			RoutingKey:"dlx.global.queue",
+			Workers:2,
+			Service:&service.TestServer{},
+			Controller:"DlxConsumer",
+			Request:&pb.DlxConsumerRequest{},
+			Config : rb.ReceiverConfig{1, 1, true, false, false, true},
+		},*/
 		//ihr
 		{
 			QueueName:"oa.employee.ihr",

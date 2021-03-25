@@ -50,7 +50,10 @@ service {{.ServerName}}{
 message {{.ModuleName}}Response{
     int32 status = 1;
     string message = 2;
-    bool data = 3;
+       //bool data = 3;
+    int32 code = 4;
+    string error = 5;
+    bool details = 6;
 }
 
 //{{.Name}}列表
@@ -68,7 +71,10 @@ message {{.ModuleName}}ListRequest{
 message {{.ModuleName}}ListResponse{
     int32 status = 1;
     string message = 2;
-    {{.ModuleName}}List data = 3;
+    //{{.ModuleName}}List data = 3;
+    int32 code = 4;
+    string error = 5;
+    {{.ModuleName}}List  details = 6;
 }
 
 message {{.ModuleName}}List {
@@ -93,5 +99,8 @@ message {{.ModuleName}}IdRequest{
 message {{.ModuleName}}DetailResponse{
     int32 status = 1;
     string message = 2;
-    {{.ModuleName}}OneRequest data = 3;
+    //{{.ModuleName}}OneRequest data = 3;
+    int32 code = 4;
+    string error = 5;
+    {{.ModuleName}}OneRequest  details = 6;
 }
